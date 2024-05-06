@@ -2,10 +2,12 @@ import mysql.connector
 from mysql.connector import Error
 import getpass
 import os
+import claim_number
 from password import PASSWORD
 from mysqlDatabase import DATABASE
 from user import USERNM
 from host import HOST
+
 
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -21,6 +23,7 @@ def create_connection(host, user, password, database):
         )
     except Error as e:
         print(f"Error connecting to the database: {e}")
+        input("Press Enter to continue...")
     return connection
 
 def add_new_user(connection):
@@ -58,13 +61,14 @@ def add_customer(connection):
         connection.commit()
         print("Customer added successfully")
 
-        # Get the CustomerID of the added customer
         cursor.execute("SELECT LAST_INSERT_ID()")
         customer_id = cursor.fetchone()[0]
         print("Customer ID:", customer_id)
+        input("Press Enter to continue...")
 
     except Error as e:
         print(f"Error adding customer: {e}")
+        input("Press Enter to continue...") 
 
 def add_agent(connection):
     clear_screen()
@@ -87,9 +91,11 @@ def add_agent(connection):
         cursor.execute("SELECT LAST_INSERT_ID()")
         agent_id = cursor.fetchone()[0]
         print("Agent ID:", agent_id)
+        input("Press Enter to continue...")
 
     except Error as e:
         print(f"Error adding agent: {e}")
+        input("Press Enter to continue...")
 
 def add_admin(connection):
     clear_screen()
@@ -103,6 +109,7 @@ def add_admin(connection):
         cursor.execute(sql, (username, password))
         connection.commit()
         print("Admin added successfully")
+        input("Press Enter to continue...")
     except Error as e:
         print(f"Error adding admin: {e}")
 
@@ -119,12 +126,15 @@ def admin_login(connection):
         admin = cursor.fetchone()
         if admin:
             print("Login successful")
+            input("Press Enter to continue...")
             return admin[0]
         else:
             print("Invalid username or password")
+            input("Press Enter to continue...")
             return None
     except Error as e:
         print(f"Error logging in as admin: {e}")
+        input("Press Enter to continue...")
         return None
 
 def agent_login(connection):
@@ -140,12 +150,15 @@ def agent_login(connection):
         agent = cursor.fetchone()
         if agent:
             print("Login successful")
+            input("Press Enter to continue...")
             return agent[0]
         else:
             print("Invalid username or password")
+            input("Press Enter to continue...")
             return None
     except Error as e:
         print(f"Error logging in as agent: {e}")
+        input("Press Enter to continue...")
         return None
 
 def customer_login(connection):
@@ -161,34 +174,40 @@ def customer_login(connection):
         customer = cursor.fetchone()
         if customer:
             print("Login successful")
+            input("Press Enter to continue...")
             return customer[0]
         else:
             print("Invalid username or password")
+            input("Press Enter to continue...")
             return None
     except Error as e:
         print(f"Error logging in as customer: {e}")
+        input("Press Enter to continue...")
         return None
-
+    
 def view_policies(connection, user_id=None, is_agent=False):
     try:
         cursor = connection.cursor()
 
         if is_agent:
-            sql = "SELECT * FROM InsurancePolicies WHERE PolicyID IN (SELECT PolicyID FROM PolicyAssignments WHERE AgentID = %s)"
+            sql = "SELECT * FROM `insurance_system`.`insurancepolicies` WHERE PolicyID IN (SELECT PolicyID FROM PolicyAssignments WHERE AgentID = %s)"
             cursor.execute(sql, (user_id,))
         else:
-            sql = "SELECT * FROM InsurancePolicies"
+            sql = "SELECT * FROM `insurance_system`.`insurancepolicies`"
             cursor.execute(sql)
 
         policies = cursor.fetchall()
 
         if not policies:
             print("No policies found")
+            input("Press Enter to continue...")
         else:
             for policy in policies:
                 print(policy)
+            input("Press Enter to continue...")
     except Error as e:
         print(f"Error viewing policies: {e}")
+        input("Press Enter to continue...")
 
 def add_policy(connection):
     clear_screen()
@@ -201,12 +220,14 @@ def add_policy(connection):
 
     try:
         cursor = connection.cursor()
-        sql = "INSERT INTO InsurancePolicies (PolicyNumber, PolicyType, PolicyStartDate, PolicyEndDate, PremiumAmount) VALUES (%s, %s, %s, %s, %s)"
+        sql = "INSERT INTO `insurance_system`.`insurancepolicies` (PolicyNumber, PolicyType, PolicyStartDate, PolicyEndDate, PremiumAmount) VALUES (%s, %s, %s, %s, %s)"
         cursor.execute(sql, (policy_number, policy_type, start_date, end_date, premium_amount))
         connection.commit()
         print("Policy added successfully")
+        input("Press Enter to continue...")
     except Error as e:
         print(f"Error adding policy: {e}")
+        input("Press Enter to continue...")
 
 def make_claim(connection, customer_id):
     clear_screen()
@@ -216,30 +237,38 @@ def make_claim(connection, customer_id):
 
     try:
         cursor = connection.cursor()
-        sql = "INSERT INTO Claims (ClaimNumber, ClaimDate, ClaimAmount, PolicyID) VALUES (%s, CURDATE(), %s, (SELECT PolicyID FROM PolicyOwnership WHERE CustomerID = %s AND PolicyID = (SELECT PolicyID FROM InsurancePolicies WHERE PolicyNumber = %s)))"
-        cursor.execute(sql, (generate_claim_number(), claim_amount, customer_id, policy_number))
+        sql = "INSERT INTO Claims (ClaimDate, ClaimAmount, PolicyID) VALUES (CURDATE(), %s, (SELECT PolicyID FROM PolicyOwnership WHERE CustomerID = %s AND PolicyID = (SELECT PolicyID FROM `insurance_system`.`insurancepolicies` WHERE PolicyNumber = %s)))"
+        cursor.execute(sql, (claim_amount, customer_id, policy_number))
         connection.commit()
         print("Claim made successfully")
+        cursor.execute("SELECT LAST_INSERT_ID()")
+        claim_id = cursor.fetchone()[0]
+        print("Claim ID:", claim_id)
+        input("Press Enter to continue...")
     except Error as e:
         print(f"Error making claim: {e}")
-
-def generate_claim_number():
-    import random
-    return f"CLM{random.randint(1000, 9999)}"
+        input("Press Enter to continue...")
 
 def approve_claim(connection):
     clear_screen()
     print("\nApprove a Claim:")
-    claim_number = input("Enter Claim Number: ")
+    claim_id = input("Enter Claim ID: ")
 
     try:
         cursor = connection.cursor()
-        sql = "UPDATE Claims SET Approved = 1 WHERE ClaimNumber = %s"
-        cursor.execute(sql, (claim_number,))
-        connection.commit()
-        print("Claim approved successfully")
+        cursor.execute("SELECT COUNT(*) FROM Claims WHERE ClaimID = %s", (claim_id,))
+        claim_exists = cursor.fetchone()[0]
+        if claim_exists:
+            sql = "UPDATE Claims SET Approved = 1 WHERE ClaimID = %s"
+            cursor.execute(sql, (claim_id,))
+            connection.commit()
+            print("Claim approved successfully")
+        else:
+            print("Claim ID does not exist")
+        input("Press Enter to continue...")
     except Error as e:
         print(f"Error approving claim: {e}")
+        input("Press Enter to continue...")
 
 def assign_policy(connection):
     clear_screen()
@@ -249,12 +278,14 @@ def assign_policy(connection):
 
     try:
         cursor = connection.cursor()
-        sql = "INSERT INTO PolicyOwnership (CustomerID, PolicyID) VALUES (%s, (SELECT PolicyID FROM InsurancePolicies WHERE PolicyNumber = %s))"
+        sql = "INSERT INTO PolicyOwnership (CustomerID, PolicyID) VALUES (%s, (SELECT PolicyID FROM `insurance_system`.`insurancepolicies` WHERE PolicyNumber = %s))"
         cursor.execute(sql, (customer_id, policy_number))
         connection.commit()
         print("Policy assigned successfully")
+        input("Press Enter to continue...")
     except Error as e:
         print(f"Error assigning policy: {e}")
+        input("Press Enter to continue...")
 
 def view_claims(connection):
     clear_screen()
@@ -268,15 +299,18 @@ def view_claims(connection):
             cursor.execute(sql, (customer_id,))
         else:
             sql = "SELECT * FROM Claims"
-            cursor.execute(sql)
+            cursor.execute(sql) 
         claims = cursor.fetchall()
         if not claims:
             print("No claims found")
+            input("Press Enter to continue...")
         else:
             for claim in claims:
                 print(claim)
+            input("Press Enter to continue...")
     except Error as e:
         print(f"Error viewing claims: {e}")
+        input("Press Enter to continue...")
 
 def view_customer_details(connection):
     clear_screen()
@@ -297,10 +331,13 @@ def view_customer_details(connection):
             print("Email:", customer[4])
             print("Phone:", customer[5])
             print("Address:", customer[6])
+            input("Press Enter to continue...")
         else:
             print("Customer not found")
+            input("Press Enter to continue...")
     except Error as e:
         print(f"Error viewing customer details: {e}")
+        input("Press Enter to continue...")
 
 def view_agent_details(connection):
     clear_screen()
@@ -320,10 +357,13 @@ def view_agent_details(connection):
             print("Last Name:", agent[3])
             print("Email:", agent[4])
             print("Phone:", agent[5])
+            input("Press Enter to continue...")
         else:
             print("Agent not found")
+            input("Press Enter to continue...")
     except Error as e:
         print(f"Error viewing agent details: {e}")
+        input("Press Enter to continue...")
 
 def view_user_details(connection):
     clear_screen()
@@ -338,8 +378,8 @@ def view_user_details(connection):
         print("Invalid choice")
 
 def customer_menu(connection, customer_id):
-    clear_screen()
     while True:
+        clear_screen()
         print("\nCustomer Menu:")
         print("1. View Policies")
         print("2. Make a Claim")
@@ -356,29 +396,26 @@ def customer_menu(connection, customer_id):
             print("Invalid choice")
 
 def agent_menu(connection, agent_id):
-    clear_screen()
     while True:
+        clear_screen()
         print("\nAgent Menu:")
-        print("1. View Policies")
-        print("2. Approve Claims")
-        print("3. Assign Policy")
-        print("4. Logout")
+        print("1. Approve Claims")
+        print("2. Assign Policy")
+        print("3. Logout")
         choice = input("Enter your choice: ")
 
         if choice == '1':
-            view_policies(connection, agent_id, is_agent=True)
-        elif choice == '2':
             approve_claim(connection)
-        elif choice == '3':
+        elif choice == '2':
             assign_policy(connection)
-        elif choice == '4':
+        elif choice == '3':
             break
         else:
             print("Invalid choice")
 
 def admin_menu(connection, admin_id):
-    clear_screen()
     while True:
+        clear_screen()
         print("\nAdmin Menu:")
         print("1. View Policies")
         print("2. Add Policy")
